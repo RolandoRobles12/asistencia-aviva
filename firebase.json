@@ -1,6 +1,14 @@
 {
+  "apphosting": {
+    "backends": [
+      {
+        "backendId": "asistencia-aviva-qlimi",
+        "location": "us-central1"
+      }
+    ]
+  },
   "hosting": {
-    "public": "out",
+    "public": "public",
     "ignore": [
       "firebase.json",
       "**/.*",
