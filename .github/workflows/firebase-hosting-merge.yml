@@ -1,4 +1,4 @@
-name: Deploy to Firebase Hosting on merge
+name: Deploy to Firebase Hosting
 
 on:
   push:
@@ -10,24 +10,27 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '18'
 
       - name: Install dependencies
         run: npm install
 
-      - name: Build project
+      - name: Build Next.js app
         run: npm run build
 
-      - name: Deploy to Firebase
+      - name: Export static site
+        run: npm run export
+
+      - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: "${{ secrets.GITHUB_TOKEN }}"
-          firebaseServiceAccount: "${{ secrets.FIREBASE_SERVICE_ACCOUNT_PROMOTORES_AVIVA_TU_NEGOCIO }}"
+          firebaseServiceAccount: "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}"
           channelId: live
-          projectId: aviva-tu-negocio
+          projectId: asistencia-aviva-qlimi
