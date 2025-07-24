@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* --- Fallback para TODO el sitio antes de aplicar un tema --- */
+  :root {
+    /* colores neutros (modo claro) */
+    --background: 0 0% 100%;        /* blanco */
+    --foreground: 224 71% 4%;       /* casi negro */
+    --card: 0 0% 100%;
+    --card-foreground: 224 71% 4%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 224 71% 4%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 239 83% 67%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 217 91% 60%;
+
+    /* radios global */
+    --radius: 0.5rem;
+  }
+
+  /* ---------- TUS PALETAS DE TEMA SIGUEN IGUAL ---------- */
+  .theme-blue   { /* …sin cambios… */ }
+  .theme-indigo { /* …sin cambios… */ }
+  .theme-green  { /* …sin cambios… */ }
+  .dark         { /* …sin cambios… */ }
+}
+
+/* utilidades globales */
+@layer base {
+  *   { border-color: hsl(var(--border)); }
+  body { background-color: hsl(var(--background));
+         color: hsl(var(--foreground)); }
+}
