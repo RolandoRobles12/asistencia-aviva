@@ -234,15 +234,7 @@ const initialTeams: Team[] = [
     { id: 'team03', name: 'Supervisores Zona Norte', memberCount: 1, members: ['user03'] },
 ];
 
-const initialUsers: User[] = [
-  { id: 'user01', name: 'Rolando Robles', email: 'rolando.robles@avivacredito.com', role: 'Super Admin', team: 'N/A', status: 'Activo' as const, avatar: 'https://placehold.co/32x32.png', slackId: 'U012AB3CD' },
-  { id: 'user02', name: 'Ana Pérez', email: 'ana.perez@example.com', role: 'Admin', team: 'N/A', status: 'Activo' as const, avatar: 'https://placehold.co/32x32.png', slackId: 'U045EF6GH'},
-  { id: 'user03', name: 'Juan García', email: 'juan.garcia@example.com', role: 'Supervisor', team: 'Promotores CDMX', status: 'Activo' as const, avatar: 'https://placehold.co/32x32.png'},
-  { id: 'user04', name: 'Carlos López', email: 'carlos.lopez@example.com', role: 'Promotor', team: 'Promotores CDMX', status: 'Activo' as const, avatar: 'https://placehold.co/32x32.png', slackId: 'U078IJ9KL'},
-  { id: 'user05', name: 'Sofía Hernández', email: 'sofia.hernandez@example.com', role: 'Promotor', team: 'Promotores Jalisco', status: 'Inactivo' as const, avatar: 'https://placehold.co/32x32.png'},
-  { id: 'user06', name: 'Pedro Sánchez', email: 'pedro.sanchez@example.com', role: 'Promotor', team: 'Promotores Jalisco', status: 'Inactivo' as const, avatar: 'https://placehold.co/32x32.png'},
-  { id: 'user07', name: 'Diego Ramírez', email: 'diego.ramirez@example.com', role: 'Promotor', team: 'Promotores CDMX', status: 'Activo' as const, avatar: 'https://placehold.co/32x32.png', slackId: 'U0AB123CD'},
-];
+const initialUsers: User[] = [];
 
 
 type GeographicStat = {

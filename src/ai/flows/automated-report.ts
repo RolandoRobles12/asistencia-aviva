@@ -141,8 +141,8 @@ const generateAutomatedReportFlow = ai.defineFlow(
 
       // User Filter
       if (input.targetUserId) {
-          const user = mockUsers.find(u => u.name === checkin.user.name);
-          if (!user || user.id !== input.targetUserId) return false;
+          const user = userMap.get(input.targetUserId);
+          if (!user || user.name !== checkin.user.name) return false;
       }
       
       // Checkin Type Filter
@@ -209,13 +209,3 @@ const generateAutomatedReportFlow = ai.defineFlow(
   }
 );
 
-// This is needed for the filter, it should be passed from the client
-const mockUsers = [
-  { id: 'user01', name: 'Rolando Robles', email: 'rolando.robles@avivacredito.com', role: 'Super Admin', team: 'N/A', status: 'Activo' as const, avatar: 'https://placehold.co/32x32.png'},
-  { id: 'user02', name: 'Ana Pérez', email: 'ana.perez@example.com', role: 'Admin', team: 'N/A', status: 'Activo' as const, avatar: 'https://placehold.co/32x32.png'},
-  { id: 'user03', name: 'Juan García', email: 'juan.garcia@example.com', role: 'Supervisor', team: 'Promotores CDMX', status: 'Activo' as const, avatar: 'https://placehold.co/32x32.png'},
-  { id: 'user04', name: 'Carlos López', email: 'carlos.lopez@example.com', role: 'Promotor', team: 'Promotores CDMX', status: 'Activo' as const, avatar: 'https://placehold.co/32x32.png'},
-  { id: 'user05', name: 'Sofía Hernández', email: 'sofia.hernandez@example.com', role: 'Promotor', team: 'Promotores Jalisco', status: 'Inactivo' as const, avatar: 'https://placehold.co/32x32.png'},
-  { id: 'user06', name: 'Pedro Sánchez', email: 'pedro.sanchez@example.com', role: 'Promotor', team: 'Promotores Jalisco', status: 'Inactivo' as const, avatar: 'https://placehold.co/32x32.png'},
-  { id: 'user07', name: 'Diego Ramírez', email: 'diego.ramirez@example.com', role: 'Promotor', team: 'Promotores CDMX', status: 'Activo' as const, avatar: 'https://placehold.co/32x32.png'},
-];
