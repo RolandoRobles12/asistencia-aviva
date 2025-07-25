@@ -19,12 +19,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
       
-      - name: Deploy to Firebase
+      - name: Deploy to Firebase with force flag
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: "${{ secrets.GITHUB_TOKEN }}"
           firebaseServiceAccount: "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}"
           channelId: live
           projectId: asistencia-aviva-qlimi
+          args: "--force"
         env:
           FIREBASE_CLI_EXPERIMENTS: webframeworks
