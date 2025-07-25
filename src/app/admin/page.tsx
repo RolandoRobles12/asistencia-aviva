@@ -136,23 +136,9 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { timeOffRequests as mockTimeOffRequests } from '@/lib/time-off';
 
-const mockCheckins: Checkin[] = [
-  { id: 'CHK001', user: { name: 'Ana Pérez', avatar: 'https://placehold.co/32x32.png' }, kioskId: 'k001', type: 'Entrada', date: '2024-07-22 08:58', punctuality: 'A tiempo', location: 'Válida', photo: 'https://placehold.co/400x400.png' },
-  { id: 'CHK002', user: { name: 'Juan García', avatar: 'https://placehold.co/32x32.png' }, kioskId: 'k002', type: 'Entrada', date: '2024-07-22 09:15', punctuality: 'Retrasado', location: 'Válida', photo: 'https://placehold.co/400x400.png' },
-  { id: 'CHK003', user: { name: 'Ana Pérez', avatar: 'https://placehold.co/32x32.png' }, kioskId: 'k001', type: 'Comida', date: '2024-07-22 14:05', punctuality: 'A tiempo', location: 'Válida', photo: 'https://placehold.co/400x400.png' },
-  { id: 'CHK004', user: { name: 'Carlos López', avatar: 'https://placehold.co/32x32.png' }, kioskId: 'k004', type: 'Entrada', date: '2024-07-22 08:50', punctuality: 'Anticipado', location: 'Válida', photo: 'https://placehold.co/400x400.png' },
-  { id: 'CHK005', user: { name: 'Juan García', avatar: 'https://placehold.co/32x32.png' }, kioskId: 'k002', type: 'Salida', date: '2024-07-22 18:05', punctuality: 'A tiempo', location: 'Válida', photo: 'https://placehold.co/400x400.png' },
-  { id: 'CHK006', user: { name: 'Pedro Sánchez', avatar: 'https://placehold.co/32x32.png' }, kioskId: 'k005', type: 'Entrada', date: '2024-07-22 09:05', punctuality: 'A tiempo', location: 'Válida', photo: 'https://placehold.co/400x400.png' },
-  { id: 'CHK007', user: { name: 'Sofía Hernández', avatar: 'https://placehold.co/32x32.png' }, kioskId: 'k006', type: 'Entrada', date: '2024-07-22 08:45', punctuality: 'Anticipado', location: 'Válida', photo: 'https://placehold.co/400x400.png' },
-  { id: 'CHK008', user: { name: 'Carlos López', avatar: 'https://placehold.co/32x32.png' }, kioskId: 'k004', type: 'Salida', date: '2024-07-22 17:50', punctuality: 'Anticipado', location: 'Válida', photo: 'https://placehold.co/400x400.png' },
-  { id: 'CHK009', user: { name: 'Ana Pérez', avatar: 'https://placehold.co/32x32.png' }, kioskId: 'k001', type: 'Salida', date: '2024-07-22 18:02', punctuality: 'A tiempo', location: 'Inválida', photo: 'https://placehold.co/400x400.png' },
-  { id: 'CHK010', user: { name: 'Diego Ramírez', avatar: 'https://placehold.co/32x32.png' }, kioskId: 'k003', type: 'Entrada', date: '2024-07-23 09:20', punctuality: 'Retrasado', location: 'Inválida', photo: 'https://placehold.co/400x400.png' },
-  { id: 'CHK011', user: { name: 'Sofía Hernández', avatar: 'https://placehold.co/32x32.png' }, kioskId: 'k006', type: 'Comida', date: '2024-07-22 13:30', punctuality: 'A tiempo', location: 'Válida', photo: 'https://placehold.co/400x400.png' },
-  { id: 'CHK012', user: { name: 'Pedro Sánchez', avatar: 'https://placehold.co/32x32.png' }, kioskId: 'k005', type: 'Salida', date: '2024-07-22 18:30', punctuality: 'Retrasado', location: 'Válida', photo: 'https://placehold.co/400x400.png' },
-  { id: 'CHK013', user: { name: 'Ana Pérez', avatar: 'https://placehold.co/32x32.png' }, kioskId: 'k002', type: 'Entrada', date: '2024-07-23 08:55', punctuality: 'A tiempo', location: 'Válida', photo: 'https://placehold.co/400x400.png' },
-  { id: 'CHK014', user: { name: 'Juan García', avatar: 'https://placehold.co/32x32.png' }, kioskId: 'k002', type: 'Entrada', date: '2024-07-23 09:30', punctuality: 'Retrasado', location: 'Válida' },
-  { id: 'CHK015', user: { name: 'Juan García', avatar: 'https://placehold.co/32x32.png' }, kioskId: 'k002', type: 'Entrada', date: '2024-07-24 09:25', punctuality: 'Retrasado', location: 'Válida' },
-];
+// Local test data removed. Use live data sources instead.
+const mockCheckins: Checkin[] = [];
+
 
 type User = {
     id: string;
