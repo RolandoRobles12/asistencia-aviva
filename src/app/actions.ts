@@ -98,7 +98,11 @@ export async function submitCheckin(formData: FormData) {
     const userName = formData.get("userName") as string;
     const kioskId = formData.get("kioskId") as string;
     const checkinType = formData.get("checkinType") as string;
-    const notes = formData.get("notes") as string;
+    const notesRaw = formData.get("notes");
+    const notes =
+      typeof notesRaw === "string" && notesRaw.trim().length > 0
+        ? notesRaw
+        : undefined;
     
     // Manejar coordenadas opcionales
     const latitudeStr = formData.get("latitude") as string;
