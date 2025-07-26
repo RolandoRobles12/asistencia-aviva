@@ -2,7 +2,10 @@
 // Corrección completa para errores de Server Components
 "use server";
 
-import { kioskAutolocation, type KioskAutolocationInput } from "@/ai/flows/kiosk-autolocation";
+import {
+  kioskAutolocation,
+  type KioskAutolocationInput,
+} from "@/ai/flows/kiosk-autolocation";
 import { kiosks } from "@/lib/kiosks";
 import { timeOffRequests as mockTimeOffRequests } from "@/lib/time-off";
 import { z } from "zod";
@@ -26,16 +29,15 @@ import { sendSlackMessage } from "@/services/slack";
 /* ---------- 1. Validación de archivos para Server Actions ---------- */
 // Función para validar si es un archivo válido en el servidor
 function isValidFile(value: unknown): value is File {
-  if (typeof value !== 'object' || value === null) return false;
-  
-  // En el servidor, FormData.get() puede devolver File o string
-  // Verificamos las propiedades que debe tener un archivo
+  if (typeof value !== "object" || value === null) return false;
+
+  // FormData.get() puede devolver File o string
+  // Validamos las propiedades básicas para considerar que es un File
   const file = value as any;
   return (
-    typeof file.name === 'string' &&
-    typeof file.size === 'number' &&
-    typeof file.type === 'string' &&
-    typeof file.stream === 'function'
+    typeof file.name === "string" &&
+    typeof file.size === "number" &&
+    typeof file.type === "string"
   );
 }
 
@@ -46,10 +48,12 @@ const checkinSchema = z.object({
   userName: z.string(),
   kioskId: z.string(),
   checkinType: z.enum(["entrada", "comida", "salida"]),
-  photos: z.array(z.any()).refine(
-    (photos) => photos.every(photo => isValidFile(photo)),
-    "Todas las fotos deben ser archivos válidos"
-  ),
+  photos: z
+    .array(z.any())
+    .refine(
+      (photos) => photos.every((photo) => isValidFile(photo)),
+      "Todas las fotos deben ser archivos válidos",
+    ),
   notes: z.string().optional(),
   latitude: z.number().optional(),
   longitude: z.number().optional(),
@@ -58,7 +62,11 @@ const checkinSchema = z.object({
 /* ---------- 3. Obtener kiosco cercano ---------- */
 export async function getClosestKiosk(latitude: number, longitude: number) {
   try {
-    const input: KioskAutolocationInput = { latitude, longitude, kioskList: kiosks };
+    const input: KioskAutolocationInput = {
+      latitude,
+      longitude,
+      kioskList: kiosks,
+    };
     return await kioskAutolocation(input);
   } catch (error) {
     console.error("Error getting closest kiosk:", error);
@@ -85,7 +93,10 @@ function hasApprovedLeave(userEmail: string, checkinDate: Date): boolean {
     (r) => r.user.name === mockUserRequest.user.name && r.status === "Aprobado",
   );
   return approved.some((r) =>
-    isWithinInterval(checkinDate, { start: parseISO(r.startDate), end: parseISO(r.endDate) }),
+    isWithinInterval(checkinDate, {
+      start: parseISO(r.startDate),
+      end: parseISO(r.endDate),
+    }),
   );
 }
 
@@ -103,7 +114,7 @@ export async function submitCheckin(formData: FormData) {
       typeof notesRaw === "string" && notesRaw.trim().length > 0
         ? notesRaw
         : undefined;
-    
+
     // Manejar coordenadas opcionales
     const latitudeStr = formData.get("latitude") as string;
     const longitudeStr = formData.get("longitude") as string;
@@ -134,10 +145,10 @@ export async function submitCheckin(formData: FormData) {
     const validated = checkinSchema.safeParse(raw);
     if (!validated.success) {
       console.error("Validation error:", validated.error.flatten().fieldErrors);
-      return { 
-        success: false, 
-        message: "Datos inválidos.", 
-        errors: validated.error.flatten().fieldErrors 
+      return {
+        success: false,
+        message: "Datos inválidos.",
+        errors: validated.error.flatten().fieldErrors,
       } as const;
     }
 
@@ -145,7 +156,10 @@ export async function submitCheckin(formData: FormData) {
 
     // Verificar días libres
     if (hasApprovedLeave(validatedData.userEmail, new Date())) {
-      return { success: false, message: "No se puede registrar. Día libre aprobado." } as const;
+      return {
+        success: false,
+        message: "No se puede registrar. Día libre aprobado.",
+      } as const;
     }
 
     // Verificar configuración de Firebase
@@ -157,22 +171,28 @@ export async function submitCheckin(formData: FormData) {
     const photoURLs: string[] = [];
     for (const photo of validatedData.photos) {
       try {
-        const fileName = (photo.name || 'photo').split('.').pop() || 'jpg';
-        const photoRef = ref(storage, `checkins/${validatedData.userId}/${uuidv4()}.${fileName}`);
-        
+        const fileName = (photo.name || "photo").split(".").pop() || "jpg";
+        const photoRef = ref(
+          storage,
+          `checkins/${validatedData.userId}/${uuidv4()}.${fileName}`,
+        );
+
         // Convertir File a ArrayBuffer para Firebase
         const arrayBuffer = await photo.arrayBuffer();
         const uint8Array = new Uint8Array(arrayBuffer);
-        
+
         const uploadResult = await uploadBytes(photoRef, uint8Array, {
           contentType: photo.type,
         });
-        
+
         const downloadURL = await getDownloadURL(uploadResult.ref);
         photoURLs.push(downloadURL);
       } catch (uploadError) {
         console.error("Error uploading photo:", uploadError);
-        return { success: false, message: "Error al subir las fotos." } as const;
+        return {
+          success: false,
+          message: "Error al subir las fotos.",
+        } as const;
       }
     }
 
@@ -184,19 +204,28 @@ export async function submitCheckin(formData: FormData) {
       kioskId: validatedData.kioskId,
       type: validatedData.checkinType,
       notes: validatedData.notes || "",
+      photo: photoURLs[0] || null,
       photoURLs,
-      location: validatedData.latitude && validatedData.longitude ? {
-        latitude: validatedData.latitude,
-        longitude: validatedData.longitude
-      } : null,
+      location:
+        validatedData.latitude && validatedData.longitude
+          ? {
+              latitude: validatedData.latitude,
+              longitude: validatedData.longitude,
+            }
+          : null,
       createdAt: serverTimestamp(),
     });
 
-    return { success: true, message: "Check-in registrado con éxito." } as const;
-
+    return {
+      success: true,
+      message: "Check-in registrado con éxito.",
+    } as const;
   } catch (error) {
     console.error("Error submitting check-in:", error);
-    return { success: false, message: "Error al guardar el registro." } as const;
+    return {
+      success: false,
+      message: "Error al guardar el registro.",
+    } as const;
   }
 }
 
@@ -210,7 +239,9 @@ const timeOffRequestSchema = z.object({
   endDate: z.date(),
 });
 
-export async function submitTimeOffRequest(data: z.infer<typeof timeOffRequestSchema>) {
+export async function submitTimeOffRequest(
+  data: z.infer<typeof timeOffRequestSchema>,
+) {
   try {
     const validated = timeOffRequestSchema.safeParse(data);
     if (!validated.success) {
@@ -218,9 +249,9 @@ export async function submitTimeOffRequest(data: z.infer<typeof timeOffRequestSc
     }
 
     const newRequest: Omit<TimeOffRequest, "id"> = {
-      user: { 
-        name: validated.data.userName, 
-        avatar: validated.data.userAvatar || "https://placehold.co/32x32.png" 
+      user: {
+        name: validated.data.userName,
+        avatar: validated.data.userAvatar || "https://placehold.co/32x32.png",
       },
       type: validated.data.type,
       reason: validated.data.reason,
@@ -232,13 +263,15 @@ export async function submitTimeOffRequest(data: z.infer<typeof timeOffRequestSc
     // Usar mock si Firebase no está configurado
     if (!isFirebaseConfigured || !db) {
       mockTimeOffRequests.push({ id: `TO${Date.now()}`, ...newRequest });
-      return { success: true, message: "Solicitud enviada (simulado)." } as const;
+      return {
+        success: true,
+        message: "Solicitud enviada (simulado).",
+      } as const;
     }
 
     // Guardar en Firebase
     await addDoc(collection(db, "timeOffRequests"), newRequest);
     return { success: true, message: "Solicitud enviada." } as const;
-
   } catch (error) {
     console.error("Error submitting time off request:", error);
     return { success: false, message: "Error al enviar solicitud." } as const;
@@ -254,13 +287,15 @@ export async function getTimeOffRequests(): Promise<TimeOffRequest[]> {
     }
 
     // Obtener de Firebase
-    const q = query(collection(db, "timeOffRequests"), orderBy("startDate", "desc"));
+    const q = query(
+      collection(db, "timeOffRequests"),
+      orderBy("startDate", "desc"),
+    );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map((doc) => ({ 
-      id: doc.id, 
-      ...(doc.data() as Omit<TimeOffRequest, "id">) 
+    return snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...(doc.data() as Omit<TimeOffRequest, "id">),
     }));
-
   } catch (error) {
     console.error("Error getting time off requests:", error);
     return mockTimeOffRequests;
@@ -272,7 +307,10 @@ const timeOffStatusSchema = z.object({
   status: z.enum(["Aprobado", "Rechazado"]),
 });
 
-export async function updateTimeOffStatus(data: { requestId: string; status: "Aprobado" | "Rechazado" }) {
+export async function updateTimeOffStatus(data: {
+  requestId: string;
+  status: "Aprobado" | "Rechazado";
+}) {
   try {
     const validated = timeOffStatusSchema.safeParse(data);
     if (!validated.success) {
@@ -285,15 +323,20 @@ export async function updateTimeOffStatus(data: { requestId: string; status: "Ap
       if (request) {
         request.status = data.status;
       }
-      return { success: true, message: `Solicitud marcada como ${data.status} (simulado).` } as const;
+      return {
+        success: true,
+        message: `Solicitud marcada como ${data.status} (simulado).`,
+      } as const;
     }
 
     // Actualizar en Firebase
-    await updateDoc(doc(db, "timeOffRequests", data.requestId), { 
-      status: data.status 
+    await updateDoc(doc(db, "timeOffRequests", data.requestId), {
+      status: data.status,
     });
-    return { success: true, message: `Solicitud marcada como ${data.status}.` } as const;
-
+    return {
+      success: true,
+      message: `Solicitud marcada como ${data.status}.`,
+    } as const;
   } catch (error) {
     console.error("Error updating time off status:", error);
     return { success: false, message: "Error al actualizar." } as const;
@@ -305,7 +348,10 @@ const timeOffCommentsSchema = z.object({
   comments: z.string().max(500),
 });
 
-export async function updateTimeOffComments(data: { requestId: string; comments: string }) {
+export async function updateTimeOffComments(data: {
+  requestId: string;
+  comments: string;
+}) {
   try {
     const validated = timeOffCommentsSchema.safeParse(data);
     if (!validated.success) {
@@ -318,18 +364,23 @@ export async function updateTimeOffComments(data: { requestId: string; comments:
       if (request) {
         (request as any).comments = data.comments;
       }
-      return { success: true, message: "Comentarios actualizados (simulado)." } as const;
+      return {
+        success: true,
+        message: "Comentarios actualizados (simulado).",
+      } as const;
     }
 
     // Actualizar en Firebase
-    await updateDoc(doc(db, "timeOffRequests", data.requestId), { 
-      comments: data.comments 
+    await updateDoc(doc(db, "timeOffRequests", data.requestId), {
+      comments: data.comments,
     });
     return { success: true, message: "Comentarios actualizados." } as const;
-
   } catch (error) {
     console.error("Error updating time off comments:", error);
-    return { success: false, message: "Error al guardar comentarios." } as const;
+    return {
+      success: false,
+      message: "Error al guardar comentarios.",
+    } as const;
   }
 }
 
@@ -339,14 +390,17 @@ const slackTestSchema = z.object({
   userId: z.string().min(1),
 });
 
-export async function sendTestSlackMessage(data: { botToken: string; userId: string }) {
+export async function sendTestSlackMessage(data: {
+  botToken: string;
+  userId: string;
+}) {
   try {
     const validated = slackTestSchema.safeParse(data);
     if (!validated.success) {
-      return { 
-        success: false, 
-        message: "Datos inválidos.", 
-        errors: validated.error.flatten().fieldErrors 
+      return {
+        success: false,
+        message: "Datos inválidos.",
+        errors: validated.error.flatten().fieldErrors,
       } as const;
     }
 
@@ -359,7 +413,6 @@ export async function sendTestSlackMessage(data: { botToken: string; userId: str
     return result.ok
       ? { success: true, message: "Mensaje enviado." }
       : { success: false, message: `Error de Slack: ${result.error}` };
-
   } catch (error) {
     console.error("Error sending test Slack message:", error);
     return { success: false, message: "Error interno." } as const;
