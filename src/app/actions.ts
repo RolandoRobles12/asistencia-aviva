@@ -1,5 +1,5 @@
 // actions.ts
-// Versión corregida completa con debug mejorado para subida de fotos
+// Versión completa con Firebase Admin SDK
 "use server";
 
 import {
@@ -10,7 +10,8 @@ import { kiosks } from "@/lib/kiosks";
 import { timeOffRequests as mockTimeOffRequests } from "@/lib/time-off";
 import { z } from "zod";
 import { isWithinInterval, parseISO, format } from "date-fns";
-import { db, storage, isFirebaseConfigured } from "@/lib/firebase";
+import { adminStorage, adminDb } from "@/lib/firebase-admin";
+import { db, isFirebaseConfigured } from "@/lib/firebase";
 import {
   collection,
   addDoc,
@@ -21,7 +22,6 @@ import {
   query,
   orderBy,
 } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { v4 as uuidv4 } from "uuid";
 import type { TimeOffRequest } from "@/lib/types";
 import { sendSlackMessage } from "@/services/slack";
@@ -101,7 +101,7 @@ function hasApprovedLeave(userEmail: string, checkinDate: Date): boolean {
   );
 }
 
-/* ---------- 5. submitCheckin corregido con debug mejorado ---------- */
+/* ---------- 5. submitCheckin con Firebase Admin SDK ---------- */
 export async function submitCheckin(formData: FormData) {
   try {
     console.log("=== SUBMIT CHECKIN DEBUG START ===");
@@ -179,20 +179,19 @@ export async function submitCheckin(formData: FormData) {
       } as const;
     }
 
-    // Verificar configuración de Firebase
-    console.log("Firebase config check:", {
-      hasDb: !!db,
-      hasStorage: !!storage,
-      isConfigured: isFirebaseConfigured
+    // Verificar configuración de Firebase Admin
+    console.log("Firebase Admin config check:", {
+      hasAdminStorage: !!adminStorage,
+      hasAdminDb: !!adminDb,
     });
 
-    if (!db || !storage) {
-      console.error("Firebase not configured properly");
-      return { success: false, message: "Firebase no configurado." } as const;
+    if (!adminStorage || !adminDb) {
+      console.error("Firebase Admin not configured properly");
+      return { success: false, message: "Firebase Admin no configurado." } as const;
     }
 
-    // Subir fotos con debug mejorado
-    console.log("Starting photo upload process...");
+    // Subir fotos con Firebase Admin SDK
+    console.log("Starting photo upload process with Admin SDK...");
     const photoURLs: string[] = [];
     
     for (let i = 0; i < validatedData.photos.length; i++) {
@@ -220,14 +219,13 @@ export async function submitCheckin(formData: FormData) {
         const fileExtension = photo.name.split('.').pop() || 'jpg';
         const fileName = `photo_${timestamp}_${randomId}.${fileExtension}`;
         
-        const photoRef = ref(
-          storage,
-          `checkins/${validatedData.userId}/${fileName}`
-        );
-
         console.log(`Creating storage reference: checkins/${validatedData.userId}/${fileName}`);
 
-        // Convertir File a ArrayBuffer para Firebase con mejor manejo de errores
+        // Usar Firebase Admin SDK Storage
+        const bucket = adminStorage.bucket();
+        const file = bucket.file(`checkins/${validatedData.userId}/${fileName}`);
+
+        // Convertir File a Buffer para Admin SDK
         let arrayBuffer: ArrayBuffer;
         try {
           arrayBuffer = await photo.arrayBuffer();
@@ -241,26 +239,30 @@ export async function submitCheckin(formData: FormData) {
           throw new Error(`Archivo de foto ${i + 1} está vacío después de la conversión`);
         }
 
-        const uint8Array = new Uint8Array(arrayBuffer);
+        const buffer = Buffer.from(arrayBuffer);
 
-        // Configuración de metadata mejorada
+        // Configuración de metadata para Admin SDK
         const metadata = {
           contentType: photo.type || 'image/jpeg',
-          customMetadata: {
-            'uploadedBy': validatedData.userId,
-            'originalName': photo.name,
-            'uploadTimestamp': new Date().toISOString(),
-            'photoIndex': i.toString()
+          metadata: {
+            uploadedBy: validatedData.userId,
+            originalName: photo.name,
+            uploadTimestamp: new Date().toISOString(),
+            photoIndex: i.toString()
           }
         };
 
-        console.log(`Starting upload for photo ${i + 1}...`);
-        const uploadResult = await uploadBytes(photoRef, uint8Array, metadata);
+        console.log(`Starting upload for photo ${i + 1} with Admin SDK...`);
+        
+        // Subir con Admin SDK
+        await file.save(buffer, metadata);
         console.log(`Upload successful for photo ${i + 1}`);
 
-        const downloadURL = await getDownloadURL(uploadResult.ref);
-        console.log(`Download URL obtained for photo ${i + 1}:`, downloadURL);
+        // Hacer el archivo público y obtener URL
+        await file.makePublic();
+        const downloadURL = `https://storage.googleapis.com/${bucket.name}/${file.name}`;
         
+        console.log(`Download URL obtained for photo ${i + 1}:`, downloadURL);
         photoURLs.push(downloadURL);
 
       } catch (uploadError) {
@@ -286,9 +288,9 @@ export async function submitCheckin(formData: FormData) {
 
     console.log(`All photos uploaded successfully. URLs:`, photoURLs);
 
-    // Guardar en Firestore
-    console.log("Saving to Firestore...");
-    const docRef = await addDoc(collection(db, "checkins"), {
+    // Guardar en Firestore usando Admin SDK
+    console.log("Saving to Firestore with Admin SDK...");
+    const docRef = await adminDb.collection("checkins").add({
       userId: validatedData.userId,
       userEmail: validatedData.userEmail,
       userName: validatedData.userName,
@@ -304,7 +306,7 @@ export async function submitCheckin(formData: FormData) {
               longitude: validatedData.longitude,
             }
           : null,
-      createdAt: serverTimestamp(),
+      createdAt: new Date(), // Admin SDK usa Date() en lugar de serverTimestamp()
     });
 
     console.log("Firestore document created with ID:", docRef.id);
