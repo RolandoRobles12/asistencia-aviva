@@ -3,18 +3,61 @@ import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getStorage } from 'firebase-admin/storage';
 import { getFirestore } from 'firebase-admin/firestore';
 
-// Validar que las variables existan
-const requiredEnvVars = {
-  projectId: process.env.FIREBASE_PROJECT_ID,
-  clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-  privateKey: process.env.FIREBASE_PRIVATE_KEY,
-  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
-};
+// Función para obtener config de Firebase Functions o variables de entorno
+function getConfig() {
+  // En Firebase Functions, usar functions.config()
+  if (typeof process !== 'undefined' && process.env.FUNCTIONS_EMULATOR) {
+    // En emulador local, usar variables de entorno
+    return {
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY,
+      storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+    };
+  }
+  
+  // Intentar usar variables de entorno primero
+  if (process.env.FIREBASE_PROJECT_ID) {
+    return {
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY,
+      storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+    };
+  }
+  
+  // Fallback a Firebase Functions config (legacy)
+  try {
+    const functions = require('firebase-functions');
+    const config = functions.config();
+    if (config.admin) {
+      return {
+        projectId: config.admin.project_id,
+        clientEmail: config.admin.client_email,
+        privateKey: config.admin.private_key,
+        storageBucket: config.admin.storage_bucket,
+      };
+    }
+  } catch (error) {
+    console.log('Firebase functions config not available, using env vars');
+  }
+  
+  // Fallback final a variables de entorno
+  return {
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+    privateKey: process.env.FIREBASE_PRIVATE_KEY,
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+  };
+}
+
+// Obtener configuración
+const requiredEnvVars = getConfig();
 
 // Verificar variables de entorno
 for (const [key, value] of Object.entries(requiredEnvVars)) {
   if (!value) {
-    throw new Error(`Missing environment variable: FIREBASE_${key.toUpperCase()}`);
+    throw new Error(`Missing Firebase Admin config: ${key}`);
   }
 }
 
