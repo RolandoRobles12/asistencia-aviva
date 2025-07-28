@@ -3,70 +3,49 @@ import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getStorage } from 'firebase-admin/storage';
 import { getFirestore } from 'firebase-admin/firestore';
 
-// Obtener configuración de Firebase Functions
-function getFirebaseConfig() {
-  try {
-    // Intentar usar Firebase Functions config
-    const functions = require('firebase-functions');
-    const config = functions.config();
-    
-    if (config.admin) {
-      console.log('Using Firebase Functions config');
-      return {
-        projectId: config.admin.project_id,
-        clientEmail: config.admin.client_email,
-        privateKey: config.admin.private_key,
-        storageBucket: config.admin.storage_bucket,
-      };
-    }
-  } catch (error) {
-    console.log('Firebase functions config not available, trying env vars');
-  }
-  
-  // Fallback a variables de entorno
-  console.log('Using environment variables');
-  return {
-    projectId: process.env.FIREBASE_PROJECT_ID,
-    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-    privateKey: process.env.FIREBASE_PRIVATE_KEY,
-    storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
-  };
-}
+// Variables de entorno simplificadas
+const firebaseAdminConfig = {
+  projectId: process.env.FIREBASE_PROJECT_ID || "asistencia-aviva-qlimi",
+  clientEmail: process.env.FIREBASE_CLIENT_EMAIL || "github-action-1025697070@asistencia-aviva-qlimi.iam.gserviceaccount.com",
+  privateKey: process.env.FIREBASE_PRIVATE_KEY,
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET || "asistencia-aviva-qlimi.appspot.com",
+};
 
-// Obtener configuración
-const firebaseConfig = getFirebaseConfig();
-
-// Verificar que todas las variables existan
-for (const [key, value] of Object.entries(firebaseConfig)) {
-  if (!value) {
-    throw new Error(`Missing Firebase Admin config: ${key}`);
-  }
-}
-
-console.log('Firebase Admin config loaded:', {
-  projectId: firebaseConfig.projectId,
-  clientEmail: firebaseConfig.clientEmail,
-  storageBucket: firebaseConfig.storageBucket,
-  privateKeyExists: !!firebaseConfig.privateKey,
+console.log('Firebase Admin config check:', {
+  projectId: firebaseAdminConfig.projectId,
+  clientEmail: firebaseAdminConfig.clientEmail,
+  storageBucket: firebaseAdminConfig.storageBucket,
+  privateKeyExists: !!firebaseAdminConfig.privateKey,
+  privateKeyLength: firebaseAdminConfig.privateKey?.length || 0,
 });
+
+// Verificar private key
+if (!firebaseAdminConfig.privateKey) {
+  console.error('FIREBASE_PRIVATE_KEY is missing!');
+  throw new Error('Missing FIREBASE_PRIVATE_KEY environment variable');
+}
 
 // Inicializar solo si no existe
 if (!getApps().length) {
   try {
+    console.log('Initializing Firebase Admin...');
+    
     initializeApp({
       credential: cert({
-        projectId: firebaseConfig.projectId!,
-        clientEmail: firebaseConfig.clientEmail!,
-        // Reemplazar \\n con saltos de línea reales
-        privateKey: firebaseConfig.privateKey!.replace(/\\n/g, '\n'),
+        projectId: firebaseAdminConfig.projectId,
+        clientEmail: firebaseAdminConfig.clientEmail,
+        privateKey: firebaseAdminConfig.privateKey.replace(/\\n/g, '\n'),
       }),
-      storageBucket: firebaseConfig.storageBucket!,
+      storageBucket: firebaseAdminConfig.storageBucket,
     });
+    
     console.log('Firebase Admin initialized successfully');
   } catch (error) {
     console.error('Error initializing Firebase Admin:', error);
     throw error;
   }
+} else {
+  console.log('Firebase Admin already initialized');
 }
 
 export const adminStorage = getStorage();
