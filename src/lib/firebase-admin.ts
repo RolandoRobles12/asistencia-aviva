@@ -23,12 +23,12 @@ if (!getApps().length) {
   try {
     initializeApp({
       credential: cert({
-        projectId: requiredEnvVars.projectId,
-        clientEmail: requiredEnvVars.clientEmail,
+        projectId: requiredEnvVars.projectId!,
+        clientEmail: requiredEnvVars.clientEmail!,
         // Reemplazar \\n con saltos de línea reales
-        privateKey: requiredEnvVars.privateKey.replace(/\\n/g, '\n'),
+        privateKey: requiredEnvVars.privateKey!.replace(/\\n/g, '\n'),
       }),
-      storageBucket: requiredEnvVars.storageBucket,
+      storageBucket: requiredEnvVars.storageBucket!,
     });
     console.log('Firebase Admin initialized successfully');
   } catch (error) {
