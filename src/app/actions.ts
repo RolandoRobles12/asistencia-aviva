@@ -1,5 +1,5 @@
 // actions.ts
-// Versión completa con Firebase Admin SDK
+// Versión sin firebase-admin (código original)
 "use server";
 
 import {
@@ -10,8 +10,7 @@ import { kiosks } from "@/lib/kiosks";
 import { timeOffRequests as mockTimeOffRequests } from "@/lib/time-off";
 import { z } from "zod";
 import { isWithinInterval, parseISO, format } from "date-fns";
-import { adminStorage, adminDb } from "@/lib/firebase-admin";
-import { db, isFirebaseConfigured } from "@/lib/firebase";
+import { db, storage, isFirebaseConfigured } from "@/lib/firebase";
 import {
   collection,
   addDoc,
@@ -22,27 +21,24 @@ import {
   query,
   orderBy,
 } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { v4 as uuidv4 } from "uuid";
 import type { TimeOffRequest } from "@/lib/types";
 import { sendSlackMessage } from "@/services/slack";
 
 /* ---------- 1. Validación de archivos para Server Actions ---------- */
-// Función para validar si es un archivo válido en el servidor
 function isValidFile(value: unknown): value is File {
   if (typeof value !== "object" || value === null) return false;
-
-  // FormData.get() puede devolver File o string
-  // Validamos las propiedades básicas para considerar que es un File
   const file = value as any;
   return (
     typeof file.name === "string" &&
     typeof file.size === "number" &&
     typeof file.type === "string" &&
-    file.size > 0 // Validar que no esté vacío
+    file.size > 0
   );
 }
 
-/* ---------- 2. Esquema de check-ins corregido ---------- */
+/* ---------- 2. Esquema de check-ins ---------- */
 const checkinSchema = z.object({
   userEmail: z.string().email(),
   userId: z.string(),
@@ -101,7 +97,7 @@ function hasApprovedLeave(userEmail: string, checkinDate: Date): boolean {
   );
 }
 
-/* ---------- 5. submitCheckin con Firebase Admin SDK ---------- */
+/* ---------- 5. submitCheckin ---------- */
 export async function submitCheckin(formData: FormData) {
   try {
     console.log("=== SUBMIT CHECKIN DEBUG START ===");
@@ -179,19 +175,20 @@ export async function submitCheckin(formData: FormData) {
       } as const;
     }
 
-    // Verificar configuración de Firebase Admin
-    console.log("Firebase Admin config check:", {
-      hasAdminStorage: !!adminStorage,
-      hasAdminDb: !!adminDb,
+    // Verificar configuración de Firebase
+    console.log("Firebase config check:", {
+      hasDb: !!db,
+      hasStorage: !!storage,
+      isConfigured: isFirebaseConfigured
     });
 
-    if (!adminStorage || !adminDb) {
-      console.error("Firebase Admin not configured properly");
-      return { success: false, message: "Firebase Admin no configurado." } as const;
+    if (!db || !storage) {
+      console.error("Firebase not configured properly");
+      return { success: false, message: "Firebase no configurado." } as const;
     }
 
-    // Subir fotos con Firebase Admin SDK
-    console.log("Starting photo upload process with Admin SDK...");
+    // Subir fotos
+    console.log("Starting photo upload process...");
     const photoURLs: string[] = [];
     
     for (let i = 0; i < validatedData.photos.length; i++) {
@@ -213,19 +210,20 @@ export async function submitCheckin(formData: FormData) {
           throw new Error(`Foto ${i + 1} muy grande. Máximo 5MB por foto.`);
         }
 
-        // Generar nombre de archivo más robusto
+        // Generar nombre de archivo
         const timestamp = Date.now();
         const randomId = Math.random().toString(36).substring(2);
         const fileExtension = photo.name.split('.').pop() || 'jpg';
         const fileName = `photo_${timestamp}_${randomId}.${fileExtension}`;
         
+        const photoRef = ref(
+          storage,
+          `checkins/${validatedData.userId}/${fileName}`
+        );
+
         console.log(`Creating storage reference: checkins/${validatedData.userId}/${fileName}`);
 
-        // Usar Firebase Admin SDK Storage
-        const bucket = adminStorage.bucket();
-        const file = bucket.file(`checkins/${validatedData.userId}/${fileName}`);
-
-        // Convertir File a Buffer para Admin SDK
+        // Convertir File a ArrayBuffer
         let arrayBuffer: ArrayBuffer;
         try {
           arrayBuffer = await photo.arrayBuffer();
@@ -239,30 +237,26 @@ export async function submitCheckin(formData: FormData) {
           throw new Error(`Archivo de foto ${i + 1} está vacío después de la conversión`);
         }
 
-        const buffer = Buffer.from(arrayBuffer);
+        const uint8Array = new Uint8Array(arrayBuffer);
 
-        // Configuración de metadata para Admin SDK
+        // Configuración de metadata
         const metadata = {
           contentType: photo.type || 'image/jpeg',
-          metadata: {
-            uploadedBy: validatedData.userId,
-            originalName: photo.name,
-            uploadTimestamp: new Date().toISOString(),
-            photoIndex: i.toString()
+          customMetadata: {
+            'uploadedBy': validatedData.userId,
+            'originalName': photo.name,
+            'uploadTimestamp': new Date().toISOString(),
+            'photoIndex': i.toString()
           }
         };
 
-        console.log(`Starting upload for photo ${i + 1} with Admin SDK...`);
-        
-        // Subir con Admin SDK
-        await file.save(buffer, metadata);
+        console.log(`Starting upload for photo ${i + 1}...`);
+        const uploadResult = await uploadBytes(photoRef, uint8Array, metadata);
         console.log(`Upload successful for photo ${i + 1}`);
 
-        // Hacer el archivo público y obtener URL
-        await file.makePublic();
-        const downloadURL = `https://storage.googleapis.com/${bucket.name}/${file.name}`;
-        
+        const downloadURL = await getDownloadURL(uploadResult.ref);
         console.log(`Download URL obtained for photo ${i + 1}:`, downloadURL);
+        
         photoURLs.push(downloadURL);
 
       } catch (uploadError) {
@@ -274,7 +268,6 @@ export async function submitCheckin(formData: FormData) {
           errorMessage: uploadError instanceof Error ? uploadError.message : 'Unknown error'
         });
         
-        // Mensaje de error más específico
         const errorMessage = uploadError instanceof Error 
           ? uploadError.message 
           : 'Error desconocido al subir foto';
@@ -288,9 +281,9 @@ export async function submitCheckin(formData: FormData) {
 
     console.log(`All photos uploaded successfully. URLs:`, photoURLs);
 
-    // Guardar en Firestore usando Admin SDK
-    console.log("Saving to Firestore with Admin SDK...");
-    const docRef = await adminDb.collection("checkins").add({
+    // Guardar en Firestore
+    console.log("Saving to Firestore...");
+    const docRef = await addDoc(collection(db, "checkins"), {
       userId: validatedData.userId,
       userEmail: validatedData.userEmail,
       userName: validatedData.userName,
@@ -306,7 +299,7 @@ export async function submitCheckin(formData: FormData) {
               longitude: validatedData.longitude,
             }
           : null,
-      createdAt: new Date(), // Admin SDK usa Date() en lugar de serverTimestamp()
+      createdAt: serverTimestamp(),
     });
 
     console.log("Firestore document created with ID:", docRef.id);
@@ -317,17 +310,10 @@ export async function submitCheckin(formData: FormData) {
       message: "Check-in registrado con éxito.",
     } as const;
   } catch (error) {
-    console.error("=== CRITICAL ERROR IN SUBMIT CHECKIN ===");
-    console.error("Error details:", {
-      error: error,
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : 'No stack trace'
-    });
-    console.error("=== END CRITICAL ERROR ===");
-    
+    console.error("=== CRITICAL ERROR IN SUBMIT CHECKIN ===", error);
     return {
       success: false,
-      message: "Error interno del servidor. Revisa la consola para más detalles.",
+      message: "Error interno del servidor.",
     } as const;
   }
 }
@@ -363,7 +349,6 @@ export async function submitTimeOffRequest(
       status: "Pendiente",
     };
 
-    // Usar mock si Firebase no está configurado
     if (!isFirebaseConfigured || !db) {
       mockTimeOffRequests.push({ id: `TO${Date.now()}`, ...newRequest });
       return {
@@ -372,7 +357,6 @@ export async function submitTimeOffRequest(
       } as const;
     }
 
-    // Guardar en Firebase
     await addDoc(collection(db, "timeOffRequests"), newRequest);
     return { success: true, message: "Solicitud enviada." } as const;
   } catch (error) {
@@ -383,13 +367,11 @@ export async function submitTimeOffRequest(
 
 export async function getTimeOffRequests(): Promise<TimeOffRequest[]> {
   try {
-    // Usar mock si Firebase no está configurado
     if (!isFirebaseConfigured || !db) {
       await new Promise((resolve) => setTimeout(resolve, 500));
       return mockTimeOffRequests;
     }
 
-    // Obtener de Firebase
     const q = query(
       collection(db, "timeOffRequests"),
       orderBy("startDate", "desc"),
@@ -420,7 +402,6 @@ export async function updateTimeOffStatus(data: {
       return { success: false, message: "Datos inválidos." } as const;
     }
 
-    // Usar mock si Firebase no está configurado
     if (!isFirebaseConfigured || !db) {
       const request = mockTimeOffRequests.find((r) => r.id === data.requestId);
       if (request) {
@@ -432,7 +413,6 @@ export async function updateTimeOffStatus(data: {
       } as const;
     }
 
-    // Actualizar en Firebase
     await updateDoc(doc(db, "timeOffRequests", data.requestId), {
       status: data.status,
     });
@@ -461,7 +441,6 @@ export async function updateTimeOffComments(data: {
       return { success: false, message: "Datos inválidos." } as const;
     }
 
-    // Usar mock si Firebase no está configurado
     if (!isFirebaseConfigured || !db) {
       const request = mockTimeOffRequests.find((r) => r.id === data.requestId);
       if (request) {
@@ -473,7 +452,6 @@ export async function updateTimeOffComments(data: {
       } as const;
     }
 
-    // Actualizar en Firebase
     await updateDoc(doc(db, "timeOffRequests", data.requestId), {
       comments: data.comments,
     });
