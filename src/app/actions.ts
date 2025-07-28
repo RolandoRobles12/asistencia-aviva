@@ -1,5 +1,5 @@
-// actions-server-fixed.ts
-// Corrección completa para errores de Server Components
+// actions.ts
+// Versión corregida completa con debug mejorado para subida de fotos
 "use server";
 
 import {
@@ -37,7 +37,8 @@ function isValidFile(value: unknown): value is File {
   return (
     typeof file.name === "string" &&
     typeof file.size === "number" &&
-    typeof file.type === "string"
+    typeof file.type === "string" &&
+    file.size > 0 // Validar que no esté vacío
   );
 }
 
@@ -100,9 +101,11 @@ function hasApprovedLeave(userEmail: string, checkinDate: Date): boolean {
   );
 }
 
-/* ---------- 5. submitCheckin corregido ---------- */
+/* ---------- 5. submitCheckin corregido con debug mejorado ---------- */
 export async function submitCheckin(formData: FormData) {
   try {
+    console.log("=== SUBMIT CHECKIN DEBUG START ===");
+    
     // Extraer datos básicos
     const userEmail = formData.get("userEmail") as string;
     const userId = formData.get("userId") as string;
@@ -114,6 +117,8 @@ export async function submitCheckin(formData: FormData) {
       typeof notesRaw === "string" && notesRaw.trim().length > 0
         ? notesRaw
         : undefined;
+
+    console.log("Basic data extracted:", { userEmail, userId, userName, kioskId, checkinType });
 
     // Manejar coordenadas opcionales
     const latitudeStr = formData.get("latitude") as string;
@@ -128,6 +133,17 @@ export async function submitCheckin(formData: FormData) {
         photos.push(value as File);
       }
     }
+
+    console.log("Photos extracted:", {
+      count: photos.length,
+      photos: photos.map((p, i) => ({
+        index: i,
+        name: p.name,
+        size: p.size,
+        type: p.type,
+        isValid: p instanceof File
+      }))
+    });
 
     const raw = {
       userEmail,
@@ -153,6 +169,7 @@ export async function submitCheckin(formData: FormData) {
     }
 
     const validatedData = validated.data;
+    console.log("Data validated successfully");
 
     // Verificar días libres
     if (hasApprovedLeave(validatedData.userEmail, new Date())) {
@@ -163,41 +180,115 @@ export async function submitCheckin(formData: FormData) {
     }
 
     // Verificar configuración de Firebase
+    console.log("Firebase config check:", {
+      hasDb: !!db,
+      hasStorage: !!storage,
+      isConfigured: isFirebaseConfigured
+    });
+
     if (!db || !storage) {
+      console.error("Firebase not configured properly");
       return { success: false, message: "Firebase no configurado." } as const;
     }
 
-    // Subir fotos
+    // Subir fotos con debug mejorado
+    console.log("Starting photo upload process...");
     const photoURLs: string[] = [];
-    for (const photo of validatedData.photos) {
+    
+    for (let i = 0; i < validatedData.photos.length; i++) {
+      const photo = validatedData.photos[i];
       try {
-        const fileName = (photo.name || "photo").split(".").pop() || "jpg";
-        const photoRef = ref(
-          storage,
-          `checkins/${validatedData.userId}/${uuidv4()}.${fileName}`,
-        );
-
-        // Convertir File a ArrayBuffer para Firebase
-        const arrayBuffer = await photo.arrayBuffer();
-        const uint8Array = new Uint8Array(arrayBuffer);
-
-        const uploadResult = await uploadBytes(photoRef, uint8Array, {
-          contentType: photo.type,
+        console.log(`Processing photo ${i + 1}/${validatedData.photos.length}:`, {
+          name: photo.name,
+          size: photo.size,
+          type: photo.type
         });
 
+        // Validar que el archivo no esté corrupto
+        if (!photo || photo.size === 0) {
+          throw new Error(`Archivo de foto ${i + 1} inválido o vacío`);
+        }
+
+        // Validar tamaño (5MB máximo)
+        if (photo.size > 5 * 1024 * 1024) {
+          throw new Error(`Foto ${i + 1} muy grande. Máximo 5MB por foto.`);
+        }
+
+        // Generar nombre de archivo más robusto
+        const timestamp = Date.now();
+        const randomId = Math.random().toString(36).substring(2);
+        const fileExtension = photo.name.split('.').pop() || 'jpg';
+        const fileName = `photo_${timestamp}_${randomId}.${fileExtension}`;
+        
+        const photoRef = ref(
+          storage,
+          `checkins/${validatedData.userId}/${fileName}`
+        );
+
+        console.log(`Creating storage reference: checkins/${validatedData.userId}/${fileName}`);
+
+        // Convertir File a ArrayBuffer para Firebase con mejor manejo de errores
+        let arrayBuffer: ArrayBuffer;
+        try {
+          arrayBuffer = await photo.arrayBuffer();
+          console.log(`ArrayBuffer created successfully. Size: ${arrayBuffer.byteLength} bytes`);
+        } catch (conversionError) {
+          console.error("Error converting file to ArrayBuffer:", conversionError);
+          throw new Error(`No se pudo procesar el archivo de foto ${i + 1}`);
+        }
+
+        if (arrayBuffer.byteLength === 0) {
+          throw new Error(`Archivo de foto ${i + 1} está vacío después de la conversión`);
+        }
+
+        const uint8Array = new Uint8Array(arrayBuffer);
+
+        // Configuración de metadata mejorada
+        const metadata = {
+          contentType: photo.type || 'image/jpeg',
+          customMetadata: {
+            'uploadedBy': validatedData.userId,
+            'originalName': photo.name,
+            'uploadTimestamp': new Date().toISOString(),
+            'photoIndex': i.toString()
+          }
+        };
+
+        console.log(`Starting upload for photo ${i + 1}...`);
+        const uploadResult = await uploadBytes(photoRef, uint8Array, metadata);
+        console.log(`Upload successful for photo ${i + 1}`);
+
         const downloadURL = await getDownloadURL(uploadResult.ref);
+        console.log(`Download URL obtained for photo ${i + 1}:`, downloadURL);
+        
         photoURLs.push(downloadURL);
+
       } catch (uploadError) {
-        console.error("Error uploading photo:", uploadError);
+        console.error(`Detailed photo upload error for photo ${i + 1}:`, {
+          error: uploadError,
+          photoName: photo.name,
+          photoSize: photo.size,
+          photoType: photo.type,
+          errorMessage: uploadError instanceof Error ? uploadError.message : 'Unknown error'
+        });
+        
+        // Mensaje de error más específico
+        const errorMessage = uploadError instanceof Error 
+          ? uploadError.message 
+          : 'Error desconocido al subir foto';
+          
         return {
           success: false,
-          message: "Error al subir las fotos.",
+          message: `Error al subir foto ${i + 1} "${photo.name}": ${errorMessage}`,
         } as const;
       }
     }
 
+    console.log(`All photos uploaded successfully. URLs:`, photoURLs);
+
     // Guardar en Firestore
-    await addDoc(collection(db, "checkins"), {
+    console.log("Saving to Firestore...");
+    const docRef = await addDoc(collection(db, "checkins"), {
       userId: validatedData.userId,
       userEmail: validatedData.userEmail,
       userName: validatedData.userName,
@@ -216,15 +307,25 @@ export async function submitCheckin(formData: FormData) {
       createdAt: serverTimestamp(),
     });
 
+    console.log("Firestore document created with ID:", docRef.id);
+    console.log("=== SUBMIT CHECKIN DEBUG END ===");
+
     return {
       success: true,
       message: "Check-in registrado con éxito.",
     } as const;
   } catch (error) {
-    console.error("Error submitting check-in:", error);
+    console.error("=== CRITICAL ERROR IN SUBMIT CHECKIN ===");
+    console.error("Error details:", {
+      error: error,
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : 'No stack trace'
+    });
+    console.error("=== END CRITICAL ERROR ===");
+    
     return {
       success: false,
-      message: "Error al guardar el registro.",
+      message: "Error interno del servidor. Revisa la consola para más detalles.",
     } as const;
   }
 }
