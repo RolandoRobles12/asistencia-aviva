@@ -37,37 +37,45 @@ function getFirebaseConfig() {
 const firebaseConfig = getFirebaseConfig();
 
 // Verificar que todas las variables existan
+let hasAllConfig = true;
 for (const [key, value] of Object.entries(firebaseConfig)) {
   if (!value) {
-    throw new Error(`Missing Firebase Admin config: ${key}`);
+    console.warn(`Missing Firebase Admin config: ${key}`);
+    hasAllConfig = false;
   }
 }
 
-console.log('Firebase Admin config loaded:', {
-  projectId: firebaseConfig.projectId,
-  clientEmail: firebaseConfig.clientEmail,
-  storageBucket: firebaseConfig.storageBucket,
-  privateKeyExists: !!firebaseConfig.privateKey,
-});
+let adminStorage: ReturnType<typeof getStorage> | null = null;
+let adminDb: ReturnType<typeof getFirestore> | null = null;
 
-// Inicializar solo si no existe
-if (!getApps().length) {
-  try {
-    initializeApp({
-      credential: cert({
-        projectId: firebaseConfig.projectId!,
-        clientEmail: firebaseConfig.clientEmail!,
-        // Reemplazar \\n con saltos de línea reales
-        privateKey: firebaseConfig.privateKey!.replace(/\\n/g, '\n'),
-      }),
-      storageBucket: firebaseConfig.storageBucket!,
-    });
-    console.log('Firebase Admin initialized successfully');
-  } catch (error) {
-    console.error('Error initializing Firebase Admin:', error);
-    throw error;
+if (hasAllConfig) {
+  console.log('Firebase Admin config loaded:', {
+    projectId: firebaseConfig.projectId,
+    clientEmail: firebaseConfig.clientEmail,
+    storageBucket: firebaseConfig.storageBucket,
+    privateKeyExists: !!firebaseConfig.privateKey,
+  });
+
+  if (!getApps().length) {
+    try {
+      initializeApp({
+        credential: cert({
+          projectId: firebaseConfig.projectId!,
+          clientEmail: firebaseConfig.clientEmail!,
+          privateKey: firebaseConfig.privateKey!.replace(/\\n/g, '\n'),
+        }),
+        storageBucket: firebaseConfig.storageBucket!,
+      });
+      console.log('Firebase Admin initialized successfully');
+    } catch (error) {
+      console.error('Error initializing Firebase Admin:', error);
+    }
   }
+
+  adminStorage = getStorage();
+  adminDb = getFirestore();
+} else {
+  console.warn('Firebase Admin not fully configured. Admin SDK features disabled.');
 }
 
-export const adminStorage = getStorage();
-export const adminDb = getFirestore();
+export { adminStorage, adminDb };
