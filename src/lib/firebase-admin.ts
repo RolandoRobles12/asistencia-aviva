@@ -20,13 +20,17 @@ console.log('Firebase Admin config check:', {
 });
 
 // Verificar private key
+let isAdminConfigured = true;
+
 if (!firebaseAdminConfig.privateKey) {
-  console.error('FIREBASE_PRIVATE_KEY is missing!');
-  throw new Error('Missing FIREBASE_PRIVATE_KEY environment variable');
+  console.warn(
+    'FIREBASE_PRIVATE_KEY is missing. Firebase Admin SDK will not be initialised.'
+  );
+  isAdminConfigured = false;
 }
 
-// Inicializar solo si no existe
-if (!getApps().length) {
+// Inicializar sólo si se cuenta con la llave y aún no existe una app
+if (isAdminConfigured && !getApps().length) {
   try {
     console.log('Initializing Firebase Admin...');
     
@@ -35,18 +39,21 @@ if (!getApps().length) {
         projectId: firebaseAdminConfig.projectId,
         clientEmail: firebaseAdminConfig.clientEmail,
         privateKey: firebaseAdminConfig.privateKey.replace(/\\n/g, '\n'),
+        privateKey: firebaseAdminConfig.privateKey!.replace(/\\n/g, '\n'),
       }),
       storageBucket: firebaseAdminConfig.storageBucket,
     });
     
+
     console.log('Firebase Admin initialized successfully');
   } catch (error) {
     console.error('Error initializing Firebase Admin:', error);
-    throw error;
+    isAdminConfigured = false;
   }
-} else {
+} else if (isAdminConfigured) {
   console.log('Firebase Admin already initialized');
 }
 
-export const adminStorage = getStorage();
-export const adminDb = getFirestore();
+export const adminStorage = isAdminConfigured ? getStorage() : null;
+export const adminDb = isAdminConfigured ? getFirestore() : null;
+export { isAdminConfigured };
