@@ -34,16 +34,15 @@ if (isAdminConfigured && !getApps().length) {
   try {
     console.log('Initializing Firebase Admin...');
     
+    // CORREGIDO: Remover la línea duplicada
     initializeApp({
       credential: cert({
         projectId: firebaseAdminConfig.projectId,
         clientEmail: firebaseAdminConfig.clientEmail,
-        privateKey: firebaseAdminConfig.privateKey.replace(/\\n/g, '\n'),
-        privateKey: firebaseAdminConfig.privateKey!.replace(/\\n/g, '\n'),
+        privateKey: firebaseAdminConfig.privateKey!.replace(/\\n/g, '\n'), // Solo una línea
       }),
       storageBucket: firebaseAdminConfig.storageBucket,
     });
-    
 
     console.log('Firebase Admin initialized successfully');
   } catch (error) {
